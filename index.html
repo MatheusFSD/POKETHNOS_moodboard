@@ -309,6 +309,76 @@
   .faixa-campos { display: flex; gap: 4px; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); }
   .faixa-campos img { width: 100%; height: 84px; object-fit: cover; display: block; flex: 1; min-width: 0; }
 
+  /* ---------- visualizador ---------- */
+
+  .card, .ref-item, .campo-item, .treinador-item { cursor: zoom-in; }
+
+  .visor {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    place-items: center;
+    padding: 28px;
+    background: rgba(18, 26, 36, .88);
+    backdrop-filter: blur(3px);
+    cursor: zoom-out;
+    animation: visor-entra .16s ease;
+  }
+  .visor.aberto { display: grid; }
+
+  @keyframes visor-entra { from { opacity: 0; } to { opacity: 1; } }
+
+  .visor-caixa {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .visor-caixa img {
+    max-width: min(100%, 92vw);
+    max-height: 82vh;
+    border-radius: 14px;
+    border: 4px solid var(--panel);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+    display: block;
+  }
+
+  .visor-caixa .trainer {
+    border-radius: 14px;
+    border: 4px solid var(--panel);
+    background-color: var(--panel-2);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+  }
+
+  .visor-nome {
+    font-family: 'Baloo 2', system-ui, sans-serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .6);
+  }
+
+  .visor-fechar {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: #fff;
+    background: rgba(255, 255, 255, .16);
+    border: 3px solid rgba(255, 255, 255, .5);
+    border-radius: 999px;
+    width: 46px;
+    height: 46px;
+    cursor: pointer;
+  }
+  .visor-fechar:hover { background: rgba(255, 255, 255, .3); }
+
   .oculto { display: none; }
 </style>
 </head>
@@ -359,6 +429,11 @@
     <div class="faixa-campos" id="faixa-campos"></div>
   </section>
 </main>
+
+<div class="visor" id="visor">
+  <button class="visor-fechar" id="visor-fechar" title="Fechar">×</button>
+  <div class="visor-caixa" id="visor-caixa"></div>
+</div>
 
 <script>
 /* ---------------------------------------------------------------
@@ -704,6 +779,94 @@ function montaFaixaCampos() {
   });
 }
 
+/* ---------------------------------------------------------------
+   Visualizador: um clique abre a imagem em tela cheia.
+   --------------------------------------------------------------- */
+
+function montaVisor() {
+  const visor = document.getElementById('visor');
+  const caixa = document.getElementById('visor-caixa');
+
+  function abre(conteudo, nome) {
+    caixa.replaceChildren();
+    caixa.appendChild(conteudo);
+    if (nome) {
+      const rotulo = document.createElement('div');
+      rotulo.className = 'visor-nome';
+      rotulo.textContent = nome;
+      caixa.appendChild(rotulo);
+    }
+    visor.classList.add('aberto');
+  }
+
+  function fecha() {
+    visor.classList.remove('aberto');
+    caixa.replaceChildren();
+  }
+
+  /* Uma imagem ampliada nao deve passar do tamanho em que foi salva:
+     esticar alem disso so entrega borrao. */
+  function imagemDe(origem) {
+    const img = document.createElement('img');
+    img.alt = origem.alt || '';
+    const limita = () => {
+      if (img.naturalWidth) img.style.maxWidth = img.naturalWidth + 'px';
+    };
+    img.addEventListener('load', limita);
+    img.src = origem.src;
+    limita(); // se ja estava em cache, o load nao dispara de novo
+    return img;
+  }
+
+  document.addEventListener('click', (e) => {
+    if (visor.classList.contains('aberto')) { fecha(); return; }
+
+    const carta = e.target.closest('.card');
+    if (carta) {
+      const img = carta.querySelector('img');
+      const nome = carta.querySelector('.card-name-overlay');
+      if (img) abre(imagemDe(img), nome ? nome.textContent : '');
+      return;
+    }
+
+    const ref = e.target.closest('.ref-item');
+    if (ref) {
+      const img = ref.querySelector('img');
+      const nome = ref.querySelector('.ref-nome');
+      if (img) abre(imagemDe(img), nome ? nome.textContent : '');
+      return;
+    }
+
+    const campo = e.target.closest('.campo-item');
+    if (campo) {
+      const img = campo.querySelector('img');
+      const nome = campo.querySelector('.campo-nome');
+      if (img) abre(imagemDe(img), nome ? nome.textContent : '');
+      return;
+    }
+
+    const treinador = e.target.closest('.treinador-item');
+    if (treinador) {
+      const sprite = treinador.querySelector('.trainer');
+      const nome = treinador.querySelector('.treinador-nome');
+      if (sprite) {
+        /* o recorte vem de background-size em porcentagem, entao basta
+           crescer o elemento que o sprite acompanha */
+        const copia = sprite.cloneNode(true);
+        const altura = Math.min(window.innerHeight * 0.72, 620);
+        copia.style.height = altura + 'px';
+        copia.style.width = Math.round(altura * TRAINER_ASPECT) + 'px';
+        abre(copia, nome ? nome.textContent : '');
+      }
+      return;
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') fecha();
+  });
+}
+
 function montaFiltros() {
   const alvo = document.getElementById('filtros');
   const opcoes = [
@@ -754,6 +917,7 @@ montaAnatomia();
 montaTriboChips();
 montaFaixaCampos();
 montaFiltros();
+montaVisor();
 </script>
 
 </body>
